@@ -1,1 +1,1 @@
-python bitches_finder_bot.py
+python bitches_finder.py
