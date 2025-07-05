@@ -16,6 +16,27 @@ from telegram.ext import (
     filters
 )
 from time import time
+from flask import Flask
+from threading import Thread
+
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Telegram bot is running!"
+
+@app.route('/health')
+def health():
+    return "OK"
+
+def run_flask():
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
+
+# Запускаємо Flask в окремому потоці
+flask_thread = Thread(target=run_flask)
+flask_thread.daemon = True
+flask_thread.start()
 
 # 🔐 ТВОЇ ДАНІ
 BOT_TOKEN = os.getenv("BOT_TOKEN")
