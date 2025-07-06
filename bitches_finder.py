@@ -16,27 +16,6 @@ from telegram.ext import (
     filters
 )
 from time import time
-from flask import Flask
-from threading import Thread
-
-app = Flask(__name__)
-
-@app.route('/')
-def home():
-    return "Telegram bot is running!"
-
-@app.route('/health')
-def health():
-    return "OK"
-
-def run_flask():
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
-
-# Запускаємо Flask в окремому потоці
-flask_thread = Thread(target=run_flask)
-flask_thread.daemon = True
-flask_thread.start()
 
 # 🔐 ТВОЇ ДАНІ
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -96,7 +75,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_states[chat_id] = 1
     user_answers[chat_id] = {}
 
-    # Статична клавіатура з командами
     reply_markup = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton("/start")],
@@ -182,13 +160,12 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
     else:
         await query.edit_message_text("Опитування завершено. Ви нам не підходите 😔")
-
         await context.bot.send_animation(
             chat_id=chat_id,
             animation="https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExeGZneTdjcG40anA4aGhzN2ptaDRvcHI1dWhhdnQxNWlzb2pobGgzdSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/IT6kBZ1k5oEeI/giphy.gif"
         )
 
-# Обробка відкритої відповіді (15)
+# Обробка текстової відповіді
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     now = time()
@@ -200,7 +177,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     text = update.message.text
     current_q = user_states.get(chat_id)
-
 
     if current_q == 15:
         user_answers[chat_id][15] = text
@@ -221,19 +197,20 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=ADMIN_ID, text=msg)
         await update.message.reply_text("Дякую за проходження! Твої відповіді відправлені власнику бота. Можете написати йому в особисті повідомлення, якщо хочете поспілкуватись. Нікнейм: @TrueSifon")
         await context.bot.send_animation(
-        chat_id=chat_id,
-        animation="https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExOXJ4ZmRkMHN0ajhtZm1vYWphOGxwNmFramp3cWhoa2l0NGE5bTdzMCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/5jT0jaNDsM6Ik7X9yq/giphy.gif"
+            chat_id=chat_id,
+            animation="https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExOXJ4ZmRkMHN0ajhtZm1vYWphOGxwNmFramp3cWhoa2l0NGE5bTdzMCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/5jT0jaNDsM6Ik7X9yq/giphy.gif"
         )
 
-    del user_states[chat_id]
-    user_answers.pop(chat_id, None)
+        del user_states[chat_id]
+        user_answers.pop(chat_id, None)
 
-# Запуск
-app = ApplicationBuilder().token(BOT_TOKEN).build()
-app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("help", help_command))
-app.add_handler(CommandHandler("about", about_command))
-app.add_handler(CallbackQueryHandler(handle_answer))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
-app.post_init = setup_commands
-app.run_polling()
+# ▶️ Запуск
+if __name__ == "__main__":
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(CommandHandler("about", about_command))
+    app.add_handler(CallbackQueryHandler(handle_answer))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    app.post_init = setup_commands
+    app.run_polling()
