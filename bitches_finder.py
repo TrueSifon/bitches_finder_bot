@@ -9,7 +9,7 @@ from telegram import (
     BotCommand
 )
 from telegram.ext import (
-    ApplicationBuilder,
+    Application,
     ContextTypes,
     CommandHandler,
     CallbackQueryHandler,
@@ -17,6 +17,8 @@ from telegram.ext import (
     filters
 )
 from time import time
+import asyncio
+from aiohttp import web
 
 # Налаштування логування
 logging.basicConfig(
@@ -28,9 +30,13 @@ logger = logging.getLogger(__name__)
 # 🔐 ТВОЇ ДАНІ
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = 588956185  # <-- заміни на свій Telegram ID
+PORT = int(os.getenv("PORT", 8000))
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # https://your-container.azurecontainer.io/webhook
 
 logger.info(f"Bot token loaded: {'Yes' if BOT_TOKEN else 'No'}")
 logger.info(f"Admin ID: {ADMIN_ID}")
+logger.info(f"Port: {PORT}")
+logger.info(f"Webhook URL: {WEBHOOK_URL}")
 
 # Стан користувачів
 user_states = {}
@@ -73,6 +79,9 @@ questions = {
     14: {"text": "Чи готові ви до знайомства з вищезначеними інтересами, якщо ще не знайомі?", "options": ["Так", "Ні"]},
     15: {"text": "Напишіть кілька слів про себе, щоб я міг краще вас зрозуміти:", "options": None}
 }
+
+# Глобальна змінна для додатку
+telegram_app = None
 
 # /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -252,32 +261,125 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Error handling text message: {e}")
 
+# Веб-сервер для webhook
+async def webhook_handler(request):
+    """Обробка webhook запитів від Telegram"""
+    try:
+        json_data = await request.json()
+        logger.info(f"Received webhook data: {json_data}")
+        
+        # Створюємо об'єкт Update з JSON
+        update = Update.de_json(json_data, telegram_app.bot)
+        
+        # Обробляємо оновлення
+        await telegram_app.process_update(update)
+        
+        return web.Response(status=200)
+    except Exception as e:
+        logger.error(f"Webhook error: {e}")
+        return web.Response(status=500)
+
+async def health_check(request):
+    """Health check для Azure"""
+    return web.Response(text="OK", status=200)
+
+async def setup_webhook():
+    """Налаштування webhook"""
+    if WEBHOOK_URL:
+        try:
+            await telegram_app.bot.set_webhook(url=WEBHOOK_URL)
+            logger.info(f"Webhook set to: {WEBHOOK_URL}")
+        except Exception as e:
+            logger.error(f"Failed to set webhook: {e}")
+    else:
+        logger.warning("No webhook URL provided")
+
+async def main():
+    """Головна функція"""
+    global telegram_app
+    
+    if not BOT_TOKEN:
+        logger.error("BOT_TOKEN not found in environment variables!")
+        return
+    
+    try:
+        # Створюємо Telegram додаток
+        telegram_app = Application.builder().token(BOT_TOKEN).build()
+        
+        # Додаємо обробники
+        telegram_app.add_handler(CommandHandler("start", start))
+        telegram_app.add_handler(CommandHandler("help", help_command))
+        telegram_app.add_handler(CommandHandler("about", about_command))
+        telegram_app.add_handler(CallbackQueryHandler(handle_answer))
+        telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+        
+        # Ініціалізуємо додаток
+        await telegram_app.initialize()
+        await telegram_app.start()
+        
+        # Налаштовуємо команди
+        await setup_commands(telegram_app)
+        
+        # Налаштовуємо webhook
+        await setup_webhook()
+        
+        # Створюємо веб-сервер
+        app = web.Application()
+        app.router.add_post("/webhook", webhook_handler)
+        app.router.add_get("/health", health_check)
+        app.router.add_get("/", health_check)  # Для root path
+        
+        # Запускаємо сервер
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, "0.0.0.0", PORT)
+        await site.start()
+        
+        logger.info(f"Bot started on port {PORT}")
+        print("Connected!")
+        
+        # Тримаємо сервер запущеним
+        try:
+            await asyncio.Event().wait()
+        except KeyboardInterrupt:
+            logger.info("Shutting down...")
+        finally:
+            await telegram_app.stop()
+            await telegram_app.shutdown()
+            await runner.cleanup()
+            
+    except Exception as e:
+        logger.error(f"Failed to start bot: {e}")
+
 # ▶️ Запуск
 if __name__ == "__main__":
     logger.info("Starting bot...")
     
-    if not BOT_TOKEN:
-        logger.error("BOT_TOKEN not found in environment variables!")
-        exit(1)
-    
-    try:
-        app = ApplicationBuilder().token(BOT_TOKEN).build()
-        
-        # Додаємо обробники
-        app.add_handler(CommandHandler("start", start))
-        app.add_handler(CommandHandler("help", help_command))
-        app.add_handler(CommandHandler("about", about_command))
-        app.add_handler(CallbackQueryHandler(handle_answer))
-        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
-        
-        # Налаштовуємо команди
-        app.post_init = setup_commands
-        
-        logger.info("Bot handlers added, starting polling...")
-        print("Connected!")  # Це повідомлення, яке ви бачите в логах
-        
-        app.run_polling(drop_pending_updates=True)
-        
-    except Exception as e:
-        logger.error(f"Failed to start bot: {e}")
-        exit(1)
+    # Якщо є WEBHOOK_URL, використовуємо webhooks, інакше polling
+    if WEBHOOK_URL:
+        logger.info("Using webhook mode")
+        asyncio.run(main())
+    else:
+        logger.info("Using polling mode (fallback)")
+        # Fallback до polling для локальної розробки
+        try:
+            app = Application.builder().token(BOT_TOKEN).build()
+            
+            # Додаємо обробники
+            app.add_handler(CommandHandler("start", start))
+            app.add_handler(CommandHandler("help", help_command))
+            app.add_handler(CommandHandler("about", about_command))
+            app.add_handler(CallbackQueryHandler(handle_answer))
+            app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+            
+            # Налаштовуємо команди
+            app.post_init = setup_commands
+            
+            logger.info("Bot handlers added, starting polling...")
+            print("Connected!")
+            
+            app.run_polling(drop_pending_updates=True)
+            
+        except Exception as e:
+            logger.error(f"Failed to start bot: {e}")
+            exit(1)
