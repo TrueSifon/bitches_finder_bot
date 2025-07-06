@@ -253,31 +253,39 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Error handling text message: {e}")
 
 # ▶️ Запуск
+
+WEBHOOK_PATH = "/webhook"
+WEBHOOK_URL = f"https://<YOUR_AZURE_APP_NAME>.azurewebsites.net{WEBHOOK_PATH}"
+
 if __name__ == "__main__":
-    logger.info("Starting bot...")
-    
+    logger.info("Starting bot with webhook...")
+
     if not BOT_TOKEN:
         logger.error("BOT_TOKEN not found in environment variables!")
         exit(1)
-    
+
     try:
         app = ApplicationBuilder().token(BOT_TOKEN).build()
-        
-        # Додаємо обробники
+
+        # Add your handlers here (as in your original code)
         app.add_handler(CommandHandler("start", start))
         app.add_handler(CommandHandler("help", help_command))
         app.add_handler(CommandHandler("about", about_command))
         app.add_handler(CallbackQueryHandler(handle_answer))
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
-        
-        # Налаштовуємо команди
+
         app.post_init = setup_commands
-        
-        logger.info("Bot handlers added, starting polling...")
-        print("Connected!")  # Це повідомлення, яке ви бачите в логах
-        
-        app.run_polling(drop_pending_updates=True)
-        
+
+        logger.info("Bot handlers added, starting webhook...")
+
+        app.run_webhook(
+            listen="0.0.0.0",
+            port=int(os.environ.get("PORT", 8000)),
+            webhook_url=WEBHOOK_URL,
+            webhook_path=WEBHOOK_PATH,
+            drop_pending_updates=True
+        )
+
     except Exception as e:
         logger.error(f"Failed to start bot: {e}")
         exit(1)
