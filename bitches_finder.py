@@ -255,7 +255,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ▶️ Запуск
 
 WEBHOOK_PATH = "/webhook"
-WEBHOOK_URL = f"https://<YOUR_AZURE_APP_NAME>.azurewebsites.net{WEBHOOK_PATH}"
+WEBHOOK_URL = f"https://<Bitches-finder>.azurewebsites.net{WEBHOOK_PATH}"
 
 if __name__ == "__main__":
     logger.info("Starting bot with webhook...")
