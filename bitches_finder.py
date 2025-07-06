@@ -262,7 +262,7 @@ if __name__ == "__main__":
         exit(1)
 
     WEBHOOK_PATH = "/webhook"
-    WEBHOOK_URL = f"https://bitches-finder.azurewebsites.net{WEBHOOK_PATH}"
+    WEBHOOK_URL = f"https://bitches-finder-d6hgaabrg4f64dbj.northeurope-01.azurewebsites.net/webhook{WEBHOOK_PATH}"
 
     try:
         app = ApplicationBuilder().token(BOT_TOKEN).build()
