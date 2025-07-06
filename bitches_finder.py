@@ -262,20 +262,16 @@ if __name__ == "__main__":
         exit(1)
 
     WEBHOOK_PATH = "/webhook"
-    WEBHOOK_URL = f"https://<Bitches-finder>.azurewebsites.net{WEBHOOK_PATH}"  # тут твоя реальна назва
+    WEBHOOK_URL = f"https://bitches-finder.azurewebsites.net{WEBHOOK_PATH}"
 
     try:
         app = ApplicationBuilder().token(BOT_TOKEN).build()
-
-        # Додаємо обробники
         app.add_handler(CommandHandler("start", start))
         app.add_handler(CommandHandler("help", help_command))
         app.add_handler(CommandHandler("about", about_command))
         app.add_handler(CallbackQueryHandler(handle_answer))
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
-
         app.post_init = setup_commands
-
         logger.info("Bot handlers added, starting webhook...")
 
         app.run_webhook(
@@ -285,7 +281,6 @@ if __name__ == "__main__":
             webhook_path=WEBHOOK_PATH,
             drop_pending_updates=True
         )
-
     except Exception as e:
         logger.error(f"Failed to start bot: {e}")
         exit(1)
