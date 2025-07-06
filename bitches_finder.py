@@ -254,9 +254,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ▶️ Запуск
 
-WEBHOOK_PATH = "/webhook"
-WEBHOOK_URL = f"https://<Bitches-finder>.azurewebsites.net{WEBHOOK_PATH}"
-
 if __name__ == "__main__":
     logger.info("Starting bot with webhook...")
 
@@ -264,10 +261,13 @@ if __name__ == "__main__":
         logger.error("BOT_TOKEN not found in environment variables!")
         exit(1)
 
+    WEBHOOK_PATH = "/webhook"
+    WEBHOOK_URL = f"https://<Bitches-finder>.azurewebsites.net{WEBHOOK_PATH}"  # тут твоя реальна назва
+
     try:
         app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-        # Add your handlers here (as in your original code)
+        # Додаємо обробники
         app.add_handler(CommandHandler("start", start))
         app.add_handler(CommandHandler("help", help_command))
         app.add_handler(CommandHandler("about", about_command))
