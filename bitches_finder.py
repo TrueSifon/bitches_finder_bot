@@ -1,5 +1,4 @@
 import os
-import logging
 from telegram import (
     Update,
     InlineKeyboardButton,
@@ -18,19 +17,9 @@ from telegram.ext import (
 )
 from time import time
 
-# Налаштування логування
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
-
 # 🔐 ТВОЇ ДАНІ
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = 588956185  # <-- заміни на свій Telegram ID
-
-logger.info(f"Bot token loaded: {'Yes' if BOT_TOKEN else 'No'}")
-logger.info(f"Admin ID: {ADMIN_ID}")
 
 # Стан користувачів
 user_states = {}
@@ -76,211 +65,152 @@ questions = {
 
 # /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        user_id = update.effective_user.id
-        logger.info(f"User {user_id} started the bot")
-        
-        now = time()
-        if user_id in last_message_time and now - last_message_time[user_id] < 0.3:
-            return
-        last_message_time[user_id] = now
+    user_id = update.effective_user.id
+    now = time()
+    if user_id in last_message_time and now - last_message_time[user_id] < 0.3:
+        return
+    last_message_time[user_id] = now
 
-        chat_id = update.effective_chat.id
-        user_states[chat_id] = 1
-        user_answers[chat_id] = {}
+    chat_id = update.effective_chat.id
+    user_states[chat_id] = 1
+    user_answers[chat_id] = {}
 
-        reply_markup = ReplyKeyboardMarkup(
-            keyboard=[
-                [KeyboardButton("/start")],
-                [KeyboardButton("/help"), KeyboardButton("/about")]
-            ],
-            resize_keyboard=True
-        )
+    reply_markup = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton("/start")],
+            [KeyboardButton("/help"), KeyboardButton("/about")]
+        ],
+        resize_keyboard=True
+    )
 
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text="Ласкаво просимо до Bitches Finder\nНатисни /start, щоб почати!",
-            reply_markup=reply_markup
-        )
-        await send_question(chat_id, context, question_number=1)
-        logger.info(f"Successfully sent start message to user {user_id}")
-    except Exception as e:
-        logger.error(f"Error in start command: {e}")
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text="Ласкаво просимо до Bitches Finder\nНатисни /start, щоб почати!",
+        reply_markup=reply_markup
+    )
+    await send_question(chat_id, context, question_number=1)
 
 # /help
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        logger.info(f"User {update.effective_user.id} requested help")
-        await update.message.reply_text("Я бот для пошуку сумісної дівчини. Почни з /start")
-    except Exception as e:
-        logger.error(f"Error in help command: {e}")
+    await update.message.reply_text("Я бот для пошуку сумісної дівчини. Почни з /start")
 
 # /about
 async def about_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        logger.info(f"User {update.effective_user.id} requested about")
-        await update.message.reply_text("Bitches Finder — експериментальний Telegram-бот для пошуку альтушки власнику бота.")
-    except Exception as e:
-        logger.error(f"Error in about command: {e}")
+    await update.message.reply_text("Bitches Finder — експериментальний Telegram-бот для пошуку альтушки власнику бота.")
 
 # Команди меню
 async def setup_commands(app):
-    try:
-        await app.bot.set_my_commands([
-            BotCommand("start", "Почати опитування"),
-            BotCommand("help", "Допомога та інструкція"),
-            BotCommand("about", "Інформація про бота")
-        ])
-        logger.info("Bot commands set successfully")
-    except Exception as e:
-        logger.error(f"Error setting up commands: {e}")
+    await app.bot.set_my_commands([
+        BotCommand("start", "Почати опитування"),
+        BotCommand("help", "Допомога та інструкція"),
+        BotCommand("about", "Інформація про бота")
+    ])
 
 # Питання
 async def send_question(chat_id, context, question_number):
-    try:
-        logger.info(f"Sending question {question_number} to chat {chat_id}")
-        q = questions[question_number]
-        user_states[chat_id] = question_number
+    q = questions[question_number]
+    user_states[chat_id] = question_number
 
-        if chat_id not in user_answers:
-            user_answers[chat_id] = {}
+    if chat_id not in user_answers:
+        user_answers[chat_id] = {}
 
-        if q["options"]:
-            buttons = [
-                [InlineKeyboardButton(text=opt, callback_data=f"{question_number}:{opt}")]
-                for opt in q["options"]
-            ]
-            reply_markup = InlineKeyboardMarkup(buttons)
-            await context.bot.send_message(chat_id=chat_id, text=q["text"], reply_markup=reply_markup)
-        else:
-            await context.bot.send_message(chat_id=chat_id, text=q["text"])
-        
-        logger.info(f"Question {question_number} sent successfully to chat {chat_id}")
-    except Exception as e:
-        logger.error(f"Error sending question {question_number} to chat {chat_id}: {e}")
+    if q["options"]:
+        buttons = [
+            [InlineKeyboardButton(text=opt, callback_data=f"{question_number}:{opt}")]
+            for opt in q["options"]
+        ]
+        reply_markup = InlineKeyboardMarkup(buttons)
+        await context.bot.send_message(chat_id=chat_id, text=q["text"], reply_markup=reply_markup)
+    else:
+        await context.bot.send_message(chat_id=chat_id, text=q["text"])
 
 # Обробка кнопок
 async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        query = update.callback_query
-        user_id = query.from_user.id
-        logger.info(f"User {user_id} clicked button: {query.data}")
-        
-        now = time()
-        if user_id in last_message_time and now - last_message_time[user_id] < 0.3:
-            return
-        last_message_time[user_id] = now
+    query = update.callback_query
+    user_id = query.from_user.id
+    now = time()
+    if user_id in last_message_time and now - last_message_time[user_id] < 0.3:
+        return
+    last_message_time[user_id] = now
 
-        await query.answer()
-        data = query.data
-        q_num_str, answer = data.split(":", 1)
-        q_num = int(q_num_str)
-        chat_id = query.message.chat_id
-        user = query.from_user
+    await query.answer()
+    data = query.data
+    q_num_str, answer = data.split(":", 1)
+    q_num = int(q_num_str)
+    chat_id = query.message.chat_id
+    user = query.from_user
 
-        correct = correct_answers.get(q_num, [])
-        is_correct = answer in correct if isinstance(correct, list) else answer == correct
+    correct = correct_answers.get(q_num, [])
+    is_correct = answer in correct if isinstance(correct, list) else answer == correct
 
-        logger.info(f"User {user_id} answered Q{q_num}: {answer}, correct: {is_correct}")
+    if is_correct:
+        if chat_id not in user_answers:
+            user_answers[chat_id] = {}
+        user_answers[chat_id][q_num] = answer
 
-        if is_correct:
-            if chat_id not in user_answers:
-                user_answers[chat_id] = {}
-            user_answers[chat_id][q_num] = answer
-
-            next_q = q_num + 1
-            if next_q in questions:
-                await send_question(chat_id, context, next_q)
-            else:
-                await query.edit_message_text("Дякую за проходження! Твої відповіді відправлені власнику бота. Можете написати йому в особисті повідомлення, якщо хочете поспілкуватись. Нікнейм: @TrueSifon")
-
-                await context.bot.send_animation(
-                    chat_id=chat_id,
-                    animation="https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExOXJ4ZmRkMHN0ajhtZm1vYWphOGxwNmFramp3cWhoa2l0NGE5bTczMCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/5jT0jaNDsM6Ik7X9yq/giphy.gif"
-                )
+        next_q = q_num + 1
+        if next_q in questions:
+            await send_question(chat_id, context, next_q)
         else:
-            await query.edit_message_text("Опитування завершено. Ви нам не підходите 😔")
+            await query.edit_message_text("Дякую за проходження! Твої відповіді відправлені власнику бота. Можете написати йому в особисті повідомлення, якщо хочете поспілкуватись. Нікнейм: @TrueSifon")
+
             await context.bot.send_animation(
                 chat_id=chat_id,
-                animation="https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExeGZneTdjcG40anA4aGhzN2ptaDRvcHI1dWhhdnQxNWlzb2pobGgzdSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/IT6kBZ1k5oEeI/giphy.gif"
+                animation="https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExOXJ4ZmRkMHN0ajhtZm1vYWphOGxwNmFramp3cWhoa2l0NGE5bTdzMCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/5jT0jaNDsM6Ik7X9yq/giphy.gif"
             )
-    except Exception as e:
-        logger.error(f"Error handling callback query: {e}")
+    else:
+        await query.edit_message_text("Опитування завершено. Ви нам не підходите 😔")
+        await context.bot.send_animation(
+            chat_id=chat_id,
+            animation="https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExeGZneTdjcG40anA4aGhzN2ptaDRvcHI1dWhhdnQxNWlzb2pobGgzdSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/IT6kBZ1k5oEeI/giphy.gif"
+        )
 
 # Обробка текстової відповіді
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        user_id = update.effective_user.id
-        logger.info(f"User {user_id} sent text message: {update.message.text}")
-        
-        now = time()
-        if user_id in last_message_time and now - last_message_time[user_id] < 0.3:
-            return
-        last_message_time[user_id] = now
+    user_id = update.effective_user.id
+    now = time()
+    if user_id in last_message_time and now - last_message_time[user_id] < 0.3:
+        return
+    last_message_time[user_id] = now
 
-        chat_id = update.effective_chat.id  
-        user = update.effective_user
-        text = update.message.text
-        current_q = user_states.get(chat_id)
+    chat_id = update.effective_chat.id  
+    user = update.effective_user
+    text = update.message.text
+    current_q = user_states.get(chat_id)
 
-        if current_q == 15:
-            user_answers[chat_id][15] = text
+    if current_q == 15:
+        user_answers[chat_id][15] = text
 
-            answers_text = "\n".join(
-                f"Q{q_num}: {questions[q_num]['text']}\n➡️ {user_answers[chat_id].get(q_num, '-')}\n"
-                for q_num in sorted(user_answers[chat_id])
-            )
+        answers_text = "\n".join(
+            f"Q{q_num}: {questions[q_num]['text']}\n➡️ {user_answers[chat_id].get(q_num, '-')}\n"
+            for q_num in sorted(user_answers[chat_id])
+        )
 
-            msg = (
-                f"✅ Хтось пройшов бот:\n"
-                f"Ім'я: {user.first_name or ''} {user.last_name or ''}\n"
-                f"Username: @{user.username or '—'}\n"
-                f"ID: {user.id}\n\n"
-                f"{answers_text}"
-            )
+        msg = (
+            f"✅ Хтось пройшов бот:\n"
+            f"Ім'я: {user.first_name or ''} {user.last_name or ''}\n"
+            f"Username: @{user.username or '—'}\n"
+            f"ID: {user.id}\n\n"
+            f"{answers_text}"
+        )
 
-            await context.bot.send_message(chat_id=ADMIN_ID, text=msg)
-            await update.message.reply_text("Дякую за проходження! Твої відповіді відправлені власнику бота. Можете написати йому в особисті повідомлення, якщо хочете поспілкуватись. Нікнейм: @TrueSifon")
-            await context.bot.send_animation(
-                chat_id=chat_id,
-                animation="https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExOXJ4ZmRkMHN0ajhtZm1vYWphOGxwNmFramp3cWhoa2l0NGE5bTczMCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/5jT0jaNDsM6Ik7X9yq/giphy.gif"
-            )
+        await context.bot.send_message(chat_id=ADMIN_ID, text=msg)
+        await update.message.reply_text("Дякую за проходження! Твої відповіді відправлені власнику бота. Можете написати йому в особисті повідомлення, якщо хочете поспілкуватись. Нікнейм: @TrueSifon")
+        await context.bot.send_animation(
+            chat_id=chat_id,
+            animation="https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExOXJ4ZmRkMHN0ajhtZm1vYWphOGxwNmFramp3cWhoa2l0NGE5bTdzMCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/5jT0jaNDsM6Ik7X9yq/giphy.gif"
+        )
 
-            del user_states[chat_id]
-            user_answers.pop(chat_id, None)
-            logger.info(f"User {user_id} completed the survey")
-    except Exception as e:
-        logger.error(f"Error handling text message: {e}")
+        del user_states[chat_id]
+        user_answers.pop(chat_id, None)
 
 # ▶️ Запуск
-
 if __name__ == "__main__":
-    logger.info("Starting bot with webhook...")
-
-    if not BOT_TOKEN:
-        logger.error("BOT_TOKEN not found in environment variables!")
-        exit(1)
-
-    WEBHOOK_PATH = "/webhook"
-    WEBHOOK_URL = "https://bitches-finder-d6hgaabrg4f64dbj.northeurope-01.azurewebsites.net/webhook"
-
-    try:
-        app = ApplicationBuilder().token(BOT_TOKEN).build()
-        app.add_handler(CommandHandler("start", start))
-        app.add_handler(CommandHandler("help", help_command))
-        app.add_handler(CommandHandler("about", about_command))
-        app.add_handler(CallbackQueryHandler(handle_answer))
-        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
-        app.post_init = setup_commands
-        logger.info("Bot handlers added, starting webhook...")
-
-        app.run_webhook(
-            listen="0.0.0.0",
-            port=int(os.environ.get("PORT", 8000)),
-            webhook_url=WEBHOOK_URL,
-            webhook_path=WEBHOOK_PATH,
-            drop_pending_updates=True
-        )
-    except Exception as e:
-        logger.error(f"Failed to start bot: {e}")
-        exit(1)
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(CommandHandler("about", about_command))
+    app.add_handler(CallbackQueryHandler(handle_answer))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    app.post_init = setup_commands
+    app.run_polling()
